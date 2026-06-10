@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Calendar as CalendarIcon } from "lucide-react";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
 
 type Course = {
   id: string;
@@ -9,6 +13,7 @@ type Course = {
   subject: string;
   price: number;
   total_sessions: number;
+  schedule_dates?: string[];
 };
 
 type Student = { id: string; full_name: string; nickname: string };
@@ -19,9 +24,11 @@ export default function CoursesPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState("");
+  
   const [formData, setFormData] = useState({
-    course_name: "", subject: "", price: "", total_sessions: ""
+    course_name: "", subject: "", price: ""
   });
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
   useEffect(() => {
     fetchCourses();
@@ -40,12 +47,22 @@ export default function CoursesPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedDates.length === 0) {
+      alert("กรุณาเลือกวันที่เรียนอย่างน้อย 1 วัน");
+      return;
+    }
+
+    const formattedDates = selectedDates.map(d => format(d, "yyyy-MM-dd"));
+
     await supabase.from("courses").insert([{
       ...formData,
       price: Number(formData.price),
-      total_sessions: Number(formData.total_sessions)
+      total_sessions: selectedDates.length,
+      schedule_dates: formattedDates
     }]);
-    setFormData({ course_name: "", subject: "", price: "", total_sessions: "" });
+
+    setFormData({ course_name: "", subject: "", price: "" });
+    setSelectedDates([]);
     setShowForm(false);
     fetchCourses();
   };
@@ -79,7 +96,19 @@ export default function CoursesPage() {
             <div className="form-group"><label>ชื่อคอร์ส</label><input required className="form-input" value={formData.course_name} onChange={e => setFormData({...formData, course_name: e.target.value})} /></div>
             <div className="form-group"><label>วิชา</label><input required className="form-input" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} /></div>
             <div className="form-group"><label>ราคา (บาท)</label><input required type="number" className="form-input" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} /></div>
-            <div className="form-group"><label>จำนวนครั้งที่สอน</label><input required type="number" className="form-input" value={formData.total_sessions} onChange={e => setFormData({...formData, total_sessions: e.target.value})} /></div>
+            
+            <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+              <label>เลือกวันที่เรียน (จำนวนครั้ง: {selectedDates.length})</label>
+              <div style={{ display: "flex", justifyContent: "center", padding: "1rem", border: "1px solid #e5e7eb", borderRadius: "12px", background: "#f9fafb" }}>
+                <DayPicker
+                  mode="multiple"
+                  selected={selectedDates}
+                  onSelect={(dates) => setSelectedDates(dates || [])}
+                  locale={th}
+                />
+              </div>
+            </div>
+
             <div className="form-group" style={{ gridColumn: "1 / -1" }}><button type="submit" className="btn" style={{width: "100%"}}>บันทึกคอร์ส</button></div>
           </form>
         </div>
@@ -115,7 +144,10 @@ export default function CoursesPage() {
               <span style={{ fontWeight: "bold" }}>฿{c.price}</span>
             </div>
             <h3 style={{ marginBottom: "4px" }}>{c.course_name}</h3>
-            <p>รวม {c.total_sessions} ครั้ง</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-muted)", fontSize: "0.875rem" }}>
+              <CalendarIcon size={16} />
+              <span>เรียนทั้งหมด {c.total_sessions} ครั้ง</span>
+            </div>
           </div>
         ))}
         {courses.length === 0 && <p className="text-center" style={{ gridColumn: "1 / -1", padding: "2rem" }}>ยังไม่มีข้อมูลคอร์ส</p>}
